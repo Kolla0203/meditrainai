@@ -11,30 +11,19 @@ CORS(app)
 tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 model = GPT2LMHeadModel.from_pretrained('gpt2')
 
-# Set pad_token to eos_token for GPT-2, since GPT-2 doesn't have a pad_token by default
-tokenizer.pad_token = tokenizer.eos_token  # Use EOS token for padding
+# Set pad_token to eos_token for GPT-2
+tokenizer.pad_token = tokenizer.eos_token
 
-# Load the dataset (database.json)
-with open('dataset.json', 'r') as f:
+# Load the dataset (dataset.json)
+with open('database.json', 'r') as f:
     medical_data = json.load(f)
 
-# Helper function to generate text using the model
+# Helper function to generate text using GPT-2
 def generate_response(prompt):
     try:
-        # Tokenize the input prompt and truncate if it's too long
         tokens = tokenizer.encode(prompt, truncation=True, max_length=512, padding="max_length")
-
-        # Ensure tokens length does not exceed the model's maximum input
-        if len(tokens) > 512:
-            print(f"Warning: Input too long, truncating to 512 tokens.")
-            tokens = tokens[:512]  # Truncate to 512 tokens
-
         input_ids = torch.tensor([tokens])
-
-        # Generate the response with a limit on the number of new tokens
         output = model.generate(input_ids, max_new_tokens=200)
-
-        # Decode the output and return it
         return tokenizer.decode(output[0], skip_special_tokens=True)
     except Exception as e:
         return f"Error: {str(e)}"
@@ -42,7 +31,7 @@ def generate_response(prompt):
 # Function to search for medical data based on the query
 def search_medical_data(query):
     for entry in medical_data:
-        if query.lower() in entry["condition"].lower():
+        if "condition" in entry and query.lower() in entry["condition"].lower():
             return entry
     return None
 
@@ -60,10 +49,10 @@ def handle_query():
 
     if medical_info:
         response = {
-            "condition": medical_info["condition"],
-            "symptoms": medical_info["symptoms"],
-            "medication": medical_info["medication"],
-            "instructions": medical_info["instructions"]
+            "condition": medical_info.get("condition", "N/A"),
+            "symptoms": medical_info.get("symptoms", []),
+            "medication": medical_info.get("medication", []),
+            "instructions": medical_info.get("instructions", "No instructions available.")
         }
     else:
         # If no direct match, use GPT-2 to generate a response
