@@ -12,8 +12,8 @@ Features
 Requirements
 - Python 3.7+
 - Flask
-- TextBlob
-- spacy
+- Transformers 
+- torch 
 - json
 
 Installation
@@ -36,7 +36,7 @@ Contributing
 Contributions are welcome! Please submit a pull request with your changes.
 
 Acknowledgments
-- TextBlob and spacy are used for sentence formation 
+- gpt 2 model is used
 Future Enhancements
 - Add support for multilingual queries
 - Enhance conversation memory to retain context over extended sessions
