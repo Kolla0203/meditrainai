@@ -1,14 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
-import spacy
-from textblob import TextBlob
+from transformers import pipeline
 
 app = Flask(__name__)
 CORS(app)
-
-# Load English NLP model
-nlp = spacy.load("en_core_web_sm")
 
 # ✅ Load Medical Data
 try:
@@ -18,73 +14,71 @@ except Exception as e:
     print(f"Error loading medical dataset: {e}")
     medical_data = []
 
-# ✅ Find Best Matching Condition Using NLP
-def find_best_match(user_symptoms):
-    matched_conditions = []
+# Preprocess medical data to create fast lookup
+symptoms_lookup = {}
+for idx, condition in enumerate(medical_data):
+    for symptom in condition.get('symptoms', []):
+        symptoms_lookup[symptom.lower()] = idx  # Map symptom to its condition index
+
+# ✅ Function to Process User Query
+def process_query(query):
+    query = query.lower()
+    matching_conditions = []
+
+    # Search for matching symptoms in the medical data using the preprocessed lookup
+    for word in query.split():
+        if word in symptoms_lookup:
+            matching_conditions.append(symptoms_lookup[word])
+
+    if not matching_conditions:
+        return "-> Sorry, I couldn't find any related conditions from your symptoms."
+
+    # Ensure unique matching conditions (some symptoms might appear in multiple conditions)
+    matching_conditions = set(matching_conditions)
     
-    for condition in medical_data:
-        condition_symptoms = set(symptom.lower() for symptom in condition.get("symptoms", []))
-        user_symptoms_set = set(symptom.lower() for symptom in user_symptoms)
+    # Prepare the response
+    responses = []
+    for idx in matching_conditions:
+        condition = medical_data[idx]
 
-        # Match if at least 50% of symptoms overlap
-        common_symptoms = condition_symptoms.intersection(user_symptoms_set)
-        match_percentage = len(common_symptoms) / max(len(condition_symptoms), 1)  # Avoid division by zero
-        
-        if match_percentage >= 0.5:  
-            matched_conditions.append((condition, match_percentage))
+        # Basic response
+        response = []
+        response.append(f"-> Condition: {condition['condition']}")
+        response.append(f"-> Symptoms: {', '.join(condition.get('symptoms', []))}")
 
-    # Sort conditions by highest match
-    matched_conditions.sort(key=lambda x: x[1], reverse=True)
-    
-    return matched_conditions[0][0] if matched_conditions else None
+        # Handle missing medications
+        medications = condition.get('medications', [])
+        if medications:
+            response.append(f"-> Medications: {', '.join(medications)}")
+        else:
+            response.append("-> Medications: Not available")
 
-# ✅ NLP-based Sentence Generation
-def generate_nlp_response(condition_data):
-    condition = condition_data["condition"]
-    symptoms = ", ".join(condition_data["symptoms"])
-    medicines = ", ".join(condition_data["medicines"])
+        response.append(f"-> Instructions: {condition.get('instructions', 'No instructions provided')}")
 
-    # Constructing the response with NLP-based sentence structuring
-    response_template = (
-        f"It looks like you may be experiencing {condition}. "
-        f"Common symptoms of this condition include {symptoms}. "
-        f"To help manage this, the following medicines are often recommended: {medicines}. "
-        f"Maintaining a proper routine and making necessary lifestyle adjustments can help in dealing with {condition}. "
-        f"Taking prescribed medicines on time and ensuring proper rest can significantly improve recovery. "
-        f"Additionally, it is important to keep track of any changes in symptoms. "
-        f"Avoiding stress, staying hydrated, and following a nutritious diet can also support better health. "
-        f"Early detection and timely care play a crucial role in managing this condition effectively."
-    )
+        responses.extend(response)
 
-    # Using TextBlob to refine the response for better readability
-    refined_response = TextBlob(response_template).correct()
+    return "\n".join(responses)
 
-    return str(refined_response)
 
-# ✅ Process User Query with NLP
+# ✅ Route for Handling Queries
 @app.route('/query', methods=['POST'])
-def process_query():
+def handle_query():
     data = request.get_json()
     if not data or 'query' not in data:
         return jsonify({"error": "Query parameter is missing"}), 400
 
-    # Extract symptoms from user query using NLP
-    user_query = data['query'].lower()
-    doc = nlp(user_query)
-    user_symptoms = [token.text for token in doc if token.pos_ in ["NOUN", "ADJ"]]
+    query = data['query']
+    response = process_query(query)
+    return jsonify({"response": response})
 
-    # Find best matching condition
-    matched_condition = find_best_match(user_symptoms)
 
-    if not matched_condition:
-        return jsonify({"response": "I'm sorry, I couldn't find any related conditions based on your symptoms."})
+# ✅ Home Route
+@app.route('/', methods=['GET'])
+def home():
+    return "Medical Chatbot API is running! Use POST /query to interact with the chatbot."
 
-    # Generate structured NLP-based response
-    response_text = generate_nlp_response(matched_condition)
-    
-    return jsonify({"response": response_text})
 
 # ✅ Run Flask Server
 if __name__ == '__main__':
-    print("Server running at: http://127.0.0.1:5001/")
+    print("Server is running! Access it at: http://127.0.0.1:5001/")
     app.run(debug=True, host="0.0.0.0", port=5001)
