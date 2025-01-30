@@ -12,8 +12,8 @@ Features
 Requirements
 - Python 3.7+
 - Flask
-- Transformers
-- torch
+- TextBlob
+- spacy
 - json
 
 Installation
@@ -23,7 +23,6 @@ Installation
 
 Usage
 1. Send a POST request to `http://127.0.0.1:5001/query` with the following JSON data:
-    - `role`: The user's role (doctor or patient)
     - `query`: The user's query
 2. The chatbot will respond with a JSON object containing the relevant medical information
 
@@ -37,9 +36,7 @@ Contributing
 Contributions are welcome! Please submit a pull request with your changes.
 
 Acknowledgments
-- Hugging Face Transformers library for providing the GPT-2 model
-- Flask for building the web application
-
+- TextBlob and spacy are used for sentence formation 
 Future Enhancements
 - Add support for multilingual queries
 - Enhance conversation memory to retain context over extended sessions
